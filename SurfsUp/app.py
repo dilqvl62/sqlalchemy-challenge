@@ -53,7 +53,6 @@ def precipitation():
         jsonify(precipitation_dict)
     )
     
-  
 @app.route("/api/v1.0/stations")
 def stations():
     # Create our session (link) from Python to the DB
@@ -61,18 +60,17 @@ def stations():
     
     # list of stations from the dataset.
     results = session.query(Station.station).all()
+    session.close()
     
     #Convert a list of tuples into a normal list
     all_stations = list(np.ravel(results))
-    session.close()
+    
     
     #Return a JSON list
     return jsonify(all_stations)
 
 @app.route("/api/v1.0/tobs")
 def tobs():
-    # Create our session (link) from Python to the DB
-    session = Session(engine)
     
     #Query the dates and temperature observations of the most-
     #active station for the previous year of data.
@@ -104,14 +102,43 @@ def min_max_avg_startDate(start):
                 print(dateObject)
             # If the date validation goes wrong
             except ValueError:
-                return jsonify({"eroor":"Incorrect data format, should be YYYY-MM-DD"}), 404
+                return jsonify({"eroor":"Incorrect date format, should be YYYY-MM-DD"}), 404
                 
             if(start <= most_recent_date):
                 Min_max_avg = session.query(func.min(Measurement.tobs), func.max(Measurement.tobs),                        func.avg(Measurement.tobs)).filter(Measurement.date >= start).all()
-                              
+                #closing the session
+                session.close()              
+                
                 return jsonify(list(np.ravel(Min_max_avg)))
             return jsonify({"error": "Date not Found."}), 404
+
+@app.route("/api/v1.0/<start>/<end>")
+def min_max_avg_startDate_endDate(start, end):
+    #  Return the min, max , and average of the tempeature from the start date 
+            #  supplied by the user to the end of the data set or 404 if the date is greater then the date 
+            #  at the end of the data set
             
+            # Create our session (link) from Python to the DB
+            session = Session(engine)
+            
+            # using try-except blocks for handling the exceptions
+            try:
+                # formatting the date using strptime() function
+                startDate = datetime.strptime(start, '%Y-%m-%d').date()
+                endDate = datetime.strptime(end, '%Y-%m-%d').date()
+                print(f"start date is:{startDate}. End date is {endDate}" )
+            # If the date validation goes wrong
+            except ValueError:
+                return jsonify({"eroor":"Incorrect date format, should be YYYY-MM-DD"}), 404
+                
+            Min_max_avg = session.query(func.min(Measurement.tobs), func.max(Measurement.tobs),                        func.avg(Measurement.tobs)).filter((Measurement.date >= start) & (Measurement.date <= end)).all()
+                #closing the session
+            session.close()              
+                
+            return jsonify(list(np.ravel(Min_max_avg)))
+            
+    
+    
             
 if __name__ == '__main__':
     app.run(debug=True)
