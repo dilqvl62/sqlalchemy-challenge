@@ -4,7 +4,8 @@ from flask import Flask, jsonify
 import sqlalchemy
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine,func
+from datetime import datetime
 from climate_starter import date_perception, one_year_Temp
 from climate_starter import one_year_Temp
 #################################################
@@ -33,7 +34,7 @@ app = Flask(__name__)
 # Flask Routes
 #################################################
 @app.route("/")
-def wecome():
+def welcome():
     return(
         f"Welcome to the climate app API! <br/>"
         f"Available Routes: <br/>"
@@ -79,9 +80,39 @@ def tobs():
     
     #Extract the temperature from the list of tuple 
     date_temp_list = [value for _, value in dates_temp]
+   
     #Return a JSON list of temperature observations for the previous year.
     return jsonify(date_temp_list)
 
+@app.route("/api/v1.0/<start>")
+def min_max_avg_startDate(start):
+            
+            #  Return the min, max , and average of the tempeature from the start date 
+            #  supplied by the user to the end of the data set or 404 if the date is greater then the date 
+            #  at the end of the data set
+            
+            # Create our session (link) from Python to the DB
+            session = Session(engine)
+            
+            #Query the most recent date witch is the last date of the dataset
+            most_recent_date = session.query(Measurement.date).order_by(Measurement.date.desc()).first()[0]
+             
+            # using try-except blocks for handling the exceptions
+            try:
+                # formatting the date using strptime() function
+                dateObject = datetime.strptime(start, '%Y-%m-%d').date()
+                print(dateObject)
+            # If the date validation goes wrong
+            except ValueError:
+                return jsonify({"eroor":"Incorrect data format, should be YYYY-MM-DD"}), 404
+                
+            if(start <= most_recent_date):
+                Min_max_avg = session.query(func.min(Measurement.tobs), func.max(Measurement.tobs),                        func.avg(Measurement.tobs)).filter(Measurement.date >= start).all()
+                              
+                return jsonify(list(np.ravel(Min_max_avg)))
+            return jsonify({"error": "Date not Found."}), 404
+            
+            
 if __name__ == '__main__':
     app.run(debug=True)
  
